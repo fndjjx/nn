@@ -57,8 +57,11 @@ class MLP():
     def fit(self, x, y):
         self.sess.run((self.cost, self.train),feed_dict={self.x:x, self.y:y})
 
-    def predict(self, x, y):
-        return self.sess.run((self.output, self.acc),feed_dict={self.x:x, self.y:y})
+    def predict(self, x, y=None):
+        if y:
+            return self.sess.run((self.output, self.acc),feed_dict={self.x:x, self.y:y})
+        else:
+            return self.sess.run((self.output),feed_dict={self.x:x})
 
     def validation_cost(self, x, y):
         return self.sess.run((self.cost),feed_dict={self.x:x, self.y:y})
@@ -105,5 +108,44 @@ def test2():
 
     print(mlp.validation_cost(x_test, y_test))
 
+def test3():
+    from datacleaner import autoclean
+    import pandas as pd
+    from sklearn.cross_validation import train_test_split
+    train_df = pd.read_csv("../dataset/titanic/train_tita.csv")
+    test_df = pd.read_csv("../dataset/titanic/test_tita.csv")
+    train_df = autoclean(train_df)
+    test_df = autoclean(test_df)
+    target = "Survived"
+
+    #df = train_df
+    #y = df[target].values
+    #x = df.drop(target,axis=1).values
+    #y = [[0,1]if i==1 else [1,0] for i in y]
+    #x_train, x_test, y_train, y_test = train_test_split(x,y)
+    #mlp = MLP(11,[50,30,30],2,tf.nn.relu)
+    #for i in range(100000):
+    #    mlp.fit(x_train, y_train)
+
+    #print(mlp.validation_cost(x_test, y_test))
+    #print(mlp.predict(x_test, y_test))
+
+    y = train_df[target].values
+    x = train_df.drop(target,axis=1).values
+    x_test = test_df.values
+    y = [[0,1]if i==1 else [1,0] for i in y]
+    mlp = MLP(11,[50,30,30],2,tf.nn.relu)
+    for i in range(100000):
+        mlp.fit(x, y)
+    result = mlp.predict(x_test)
+    result = np.array([0 if i[0]>i[1] else 1 for i in result])
+    print(result)
+   
+    id = test_df["PassengerId"]
+    result = pd.DataFrame({"PassengerId":id,"Survived":result})
+    result.to_csv("subminssion.csv",index=False)
+
+
+
 if __name__=="__main__":
-    test()
+    test3()
