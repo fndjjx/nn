@@ -4,25 +4,32 @@ from emd import one_dimension_emd
 
 
 class RNN():
-    def __init__(self, n_input, n_step, n_hidden, n_output, n_layer):
+    def __init__(self, n_input, n_step_input, n_step_output, n_hidden, n_output, n_layer):
         tf.reset_default_graph()
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_output = n_output
         self.n_layer = n_layer
 
-        self.x = tf.placeholder(tf.float32, [None, n_step, n_input])
-        self.y = tf.placeholder(tf.float32, [None, n_step, n_output])
+        self.x = tf.placeholder(tf.float32, [None, n_step_input, n_input])
+        self.y = tf.placeholder(tf.float32, [None, n_step_output, n_output])
 
-        #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicRNNCell(num_units=n_hidden, activation=tf.nn.relu), output_size = n_output)
-        cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden), output_size = n_output)
+        cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicRNNCell(num_units=n_hidden, activation=tf.nn.relu), output_size = n_output)
+        #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden), output_size = n_output)
         #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.GRUCell(num_units=n_hidden), output_size = n_output)
-        cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=0.5)
-        multi_layer_cell = tf.contrib.rnn.MultiRNNCell([cell] * n_layer)
-        self.output, states = tf.nn.dynamic_rnn(multi_layer_cell, self.x, dtype=tf.float32)
+        drop_cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=0.5)
+        drop_multi_layer_cell = tf.contrib.rnn.MultiRNNCell([drop_cell] * n_layer)
+        drop_rnn_output, states = tf.nn.dynamic_rnn(drop_multi_layer_cell, self.x, dtype=tf.float32)
+        weight = self.weight_variable([n_step_input, n_step_output])
+        bias = self.bias_variable([n_step_output])
+        drop_rnn_output = tf.reshape(drop_rnn_output, [-1,n_step_input])
+        self.output = tf.matmul(drop_rnn_output, weight)+bias
+
        
-        #self.loss = tf.reduce_sum(tf.pow(self.output-self.y,2))
-        self.loss = tf.reduce_sum(abs(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]))/((abs(tf.reshape(self.output,[-1]))+abs(tf.reshape(self.y,[-1])))/2))
+        
+       
+        self.loss = tf.reduce_sum(tf.pow(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]),2))
+        #self.loss = tf.reduce_sum(abs(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]))/((abs(tf.reshape(self.output,[-1]))+abs(tf.reshape(self.y,[-1])))/2))
         optimizer = tf.train.AdamOptimizer(0.001)
         self.train = optimizer.minimize(self.loss)
  
@@ -49,24 +56,33 @@ class RNN():
 
 def test():
 
-    data = np.sin(range(101))        
-    x_data = data[:-1]
-    y_data = data[1:]
-    x = np.reshape(x_data, [-1,20,1])
-    y = np.reshape(y_data, [-1,20,1])
-    print(x[-1])
-    print(y[-1])
-    rnn = RNN(1,20,100,1,2)
-    for i in range(1000):
+    data = np.sin(np.array(range(101))*0.01)        
+    x = []
+    y = []
+    for i in range(len(data)-21):
+        x.append([[j] for j in data[i:i+20]])
+        y.append([[data[i+20]]])
+    print(x[0])
+    print(y[0])
+    print(x[1])
+    print(y[1])
+    rnn = RNN(1,20,1,500,1,2)
+    for i in range(5000):
+        #batch_index = np.random.randint(0,len(x))
+        #xx = [x[batch_index]]
+        #yy = [y[batch_index]]
+
         _,loss=rnn.fit(x,y)
         print(loss)
 
-    test_data = np.sin(np.array(range(21))+100)        
-    x_data = test_data[:-1]
-    x_test = np.reshape(x_data, [-1,20,1])
-    output = rnn.predict(x_test)
+    output = rnn.predict([x[-1]])
     print(output)
-    print(test_data[1:])
+    print(y[-1])
+    x = np.sin(np.array(range(2001))*0.01)        
+    output = rnn.predict([[[i] for i in x[-21:-1]]])
+    print(output)
+    print(x[-1])
+
 
 
 def test2():
@@ -155,4 +171,4 @@ def test3():
     
 
 if __name__=="__main__":
-    test3()
+    test()
