@@ -28,9 +28,9 @@ class RNN():
        
         
        
-        self.loss = tf.reduce_sum(tf.pow(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]),2))
-        #self.loss = tf.reduce_sum(abs(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]))/((abs(tf.reshape(self.output,[-1]))+abs(tf.reshape(self.y,[-1])))/2))
-        optimizer = tf.train.AdamOptimizer(0.001)
+        #self.loss = tf.reduce_sum(tf.pow(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]),2))
+        self.loss = tf.reduce_sum(abs(tf.reshape(self.output,[-1])-tf.reshape(self.y,[-1]))/((abs(tf.reshape(self.output,[-1]))+abs(tf.reshape(self.y,[-1])))/2))
+        optimizer = tf.train.AdamOptimizer()
         self.train = optimizer.minimize(self.loss)
  
         init = tf.global_variables_initializer()
@@ -90,24 +90,28 @@ def test2():
     raw_data = pd.read_csv("/tmp/111.csv")["2NE1_zh.wikipedia.org_all-access_spider"].values
     data = raw_data[-540:-60]
 
-    x_data = data[:-60]
-    y_data = data[60:]
-    x = np.reshape(x_data, [-1,60,1])
-    y = np.reshape(y_data, [-1,60,1])
-    rnn = RNN(1,60,300,1,20)
-    for i in range(100):
-        batch_index = np.random.randint(0,len(x))
-        xx = [x[batch_index]]
-        yy = [y[batch_index]]
-        _,loss=rnn.fit(xx,yy)
+    x = []
+    y = []
+    for i in range(len(data)-360):
+        x.append([[j] for j in data[i:i+300]])
+        y.append([[j] for j in data[i+300:i+360]])
+    print(x[0])
+    print(y[0])
+    rnn = RNN(1,300,60,1000,1,5)
+    for i in range(3000):
+        #batch_index = np.random.randint(0,len(x))
+        #xx = [x[batch_index]]
+        #yy = [y[batch_index]]
+        _,loss=rnn.fit(x,y)
         print(loss)
 
-    x_test = data[-60:]
-    x_test = np.reshape(x_test, [-1,60,1])
+    x_test = [[[j] for j in data[-300:]]]
     y_test = raw_data[-60:]
+    print(x_test)
     output = rnn.predict(x_test)
     output = np.ravel(output)
     y_test = np.ravel(y_test)
+    print(output)
 
     def smape(target,pred):
         up = abs(target-pred)
@@ -171,4 +175,4 @@ def test3():
     
 
 if __name__=="__main__":
-    test()
+    test2()
