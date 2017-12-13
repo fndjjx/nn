@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import better_exceptions
 
 def xavier_init(n_in, n_out):
     low = -np.sqrt(6/(n_in+n_out))
@@ -82,7 +83,7 @@ def test():
     y_test = mnist.test.labels
 
     mlp = MLP(784,[500,500],10,tf.nn.relu)
-    for i in range(100):
+    for i in range(10):
         print(i)
         x_batch, y_batch = mnist.train.next_batch(100)
         mlp.fit(x_train, y_train)
@@ -148,4 +149,4 @@ def test3():
 
 
 if __name__=="__main__":
-    test3()
+    test()

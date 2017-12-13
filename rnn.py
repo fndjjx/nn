@@ -1,6 +1,9 @@
 import tensorflow as tf
 import numpy as np
 from emd import one_dimension_emd
+import pandas as pd
+import better_exceptions
+from sklearn.metrics import mean_squared_error, r2_score
 
 
 class RNN():
@@ -14,11 +17,20 @@ class RNN():
         self.x = tf.placeholder(tf.float32, [None, n_step_input, n_input])
         self.y = tf.placeholder(tf.float32, [None, n_step_output, n_output])
 
-        cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicRNNCell(num_units=n_hidden, activation=tf.nn.relu), output_size = n_output)
+        #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicRNNCell(num_units=n_hidden, activation=tf.nn.relu), output_size = n_output)
         #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden), output_size = n_output)
-        #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.GRUCell(num_units=n_hidden), output_size = n_output)
-        drop_cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=0.5)
-        drop_multi_layer_cell = tf.contrib.rnn.MultiRNNCell([drop_cell] * n_layer)
+#        cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.GRUCell(num_units=n_hidden), output_size = n_output)
+#        drop_cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=0.5)
+
+        #https://stackoverflow.com/questions/44615147/valueerror-trying-to-share-variable-rnn-multi-rnn-cell-cell-0-basic-lstm-cell-k
+        def drop_cell():
+            cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.GRUCell(num_units=n_hidden), output_size = n_output)
+            drop_cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=0.5)
+            return drop_cell
+        stacked_cell = [drop_cell() for _ in range(n_layer)]
+        #drop_multi_layer_cell = tf.contrib.rnn.MultiRNNCell([drop_cell] * n_layer)
+        drop_multi_layer_cell = tf.contrib.rnn.MultiRNNCell(stacked_cell)
+
         drop_rnn_output, states = tf.nn.dynamic_rnn(drop_multi_layer_cell, self.x, dtype=tf.float32)
         weight = self.weight_variable([n_step_input, n_step_output])
         bias = self.bias_variable([n_step_output])
@@ -172,7 +184,62 @@ def test3():
     y_test = raw_data1[-60:]
     print(smape(y_test,np.array([np.median(raw_data1[-49:])]*60)))
     print(smape(y_test,output))
+
+def test4():
+    df = pd.read_csv("data.csv")
+    data = df.values
+    target = df.close.values
+
+    x_train = data[:-100]
+    y_train = target[:-100]
+
+
+    x_test = data[-100:]
+    y_test = target[-100:]
+
+    x = []
+    y = []
+    p = 20
+    for i in range(len(x_train)-p):
+        x.append([j for j in x_train[i:i+p]])
+        y.append([[y_train[i+p]]])
+    print(x[1])
+    print(y[0])
+
+    x_test1=[]
+    y_test1=[]
+    for i in range(len(x_test)-p):
+        x_test1.append([j for j in x_test[i:i+p]])
+        y_test1.append([[y_test[i+p]]])
+    print(x[-1])
+    print(y[-2])
+    rnn = RNN(6,p,1,1000,1,3)
+    for i in range(5000):
+    #    #batch_index = np.random.randint(0,len(x))
+    #    #xx = [x[batch_index]]
+    #    #yy = [y[batch_index]]
+
+        _,loss=rnn.fit(x,y)
+        print(loss)
+
+    print("predict")
+    pred =[]
+    true = []
+    for i in range(len(x_test1)):
+        output = rnn.predict([x_test1[i]])
+        print(output)
+        print(y_test1[i])
+        pred.append(output[0][0])
+        true.append(y_test1[i][0][0])
+    print(float(r2_score(true, pred)))
+    #x = np.sin(np.array(range(2001))*0.01)
+    #output = rnn.predict([[[i] for i in x[-21:-1]]])
+    #print(output)
+    #print(x[-1])
+
+    
+
     
 
 if __name__=="__main__":
-    test2()
+    test4()
