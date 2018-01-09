@@ -60,9 +60,9 @@ def get_encoder(encoder_input, embedding_size, vocab_size, encoder_hidden_size):
     
     #encoder
     #encoder_cell = tf.contrib.rnn.GRUCell(num_units=encoder_hidden_size)
-    encoder_cell =  tf.contrib.rnn.MultiRNNCell([get_cell(encoder_hidden_size) for i in range(3)])
-    _, encoder_final_state = tf.nn.dynamic_rnn(encoder_cell, encoder_input_embedding, dtype=tf.float32, scope="encoder")
-    return encoder_final_state
+    encoder_cell =  tf.contrib.rnn.MultiRNNCell([get_encoder_cell(encoder_hidden_size) for i in range(3)])
+    encoder_output, encoder_final_state = tf.nn.dynamic_rnn(encoder_cell, encoder_input_embedding, dtype=tf.float32, scope="encoder")
+    return encoder_output, encoder_final_state
 
 def process_decoder_input(data, vocab2index):
     decoder_input_cut = tf.strided_slice(data, [0,0],[batch_size,-1],[1,1])
@@ -73,29 +73,43 @@ def process_decoder_input(data, vocab2index):
 #print(fill_data(source_data)[:10])
 #print(source_transform[:10])
 #print(process_decoder_input(target_transform, target_vocab2index))
-def get_cell(size):
+def get_encoder_cell(size):
     cell = tf.contrib.rnn.GRUCell(num_units=size)
     return cell
 
-def get_decoder(decoder_input, embedding_size, vocab_size, decoder_hidden_size, target_sequence_length, encoder_state):
+def get_decoder_cell(size, attention_mechanism):
+    cell = tf.contrib.rnn.GRUCell(num_units=size)
+    attn_cell = tf.contrib.seq2seq.AttentionWrapper(cell, attention_mechanism, attention_layer_size=5)
+    return attn_cell
+
+def get_decoder(decoder_input, embedding_size, vocab_size, decoder_hidden_size, target_sequence_length, encoder_state, encoder_output):
     #embdding
     decoder_embeddings = tf.Variable(tf.random_uniform([vocab_size, embedding_size],-1,1))
     decoder_input_embedding = tf.nn.embedding_lookup(decoder_embeddings, decoder_input)
 
     #decoder
     #decoder_cell = tf.contrib.rnn.GRUCell(num_units=decoder_hidden_size)
-    decoder_cell =  tf.contrib.rnn.MultiRNNCell([get_cell(decoder_hidden_size) for i in range(3)])
+    attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(num_units=5, memory=encoder_output)
+
+    decoder_cell =  tf.contrib.rnn.MultiRNNCell([get_decoder_cell(decoder_hidden_size, attention_mechanism) for i in range(3)])
+    #decoder_cell =  tf.contrib.rnn.MultiRNNCell([get_encoder_cell(decoder_hidden_size) for i in range(3)])
     
     decoder_output = Dense(len(target_index2vocab))
    
     with tf.variable_scope("decoder"):
         train_helper = tf.contrib.seq2seq.TrainingHelper(decoder_input_embedding, target_sequence_length)
-        train_decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, train_helper, encoder_state, decoder_output)
+        #not use attention
+        #train_decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, train_helper, encoder_state, decoder_output)
+        #use attention
+        train_decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, train_helper, decoder_cell.zero_state(dtype=tf.float32, batch_size=batch_size), decoder_output)
         train_decoder_output, _, _ = tf.contrib.seq2seq.dynamic_decode(train_decoder)
 
     with tf.variable_scope("decoder", reuse=True):
         predict_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(decoder_embeddings, tf.fill([batch_size], target_vocab2index["<GO>"]), target_vocab2index["<EOS>"])
-        predict_decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, predict_helper, encoder_state, decoder_output)
+        #not use attention
+        #predict_decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, predict_helper, encoder_state, decoder_output)
+        #use attention
+        predict_decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, predict_helper, decoder_cell.zero_state(dtype=tf.float32, batch_size=batch_size), decoder_output)
         predict_decoder_output, _, _ = tf.contrib.seq2seq.dynamic_decode(predict_decoder, maximum_iterations=max_length)
 
     return train_decoder_output, predict_decoder_output
@@ -104,14 +118,15 @@ def get_decoder(decoder_input, embedding_size, vocab_size, decoder_hidden_size, 
 def get_seq2seq_model(encoder_input, encoder_embedding_size, vocab_size, encoder_hidden_size, 
                       decoder_input, decoder_embedding_size, decoder_hidden_size, target_sequence_length):
 
-    encoder_state = get_encoder(encoder_input, encoder_embedding_size, vocab_size, encoder_hidden_size)
+    encoder_output, encoder_state = get_encoder(encoder_input, encoder_embedding_size, vocab_size, encoder_hidden_size)
     decoder_input = process_decoder_input(decoder_input, target_vocab2index)
     train_decoder_output, predict_decoder_output = get_decoder(decoder_input, 
                                                                decoder_embedding_size, 
                                                                vocab_size, 
                                                                decoder_hidden_size, 
                                                                target_sequence_length, 
-                                                               encoder_state)
+                                                               encoder_state,
+                                                               encoder_output)
     return train_decoder_output, predict_decoder_output
 
     
@@ -122,7 +137,7 @@ vocab_size = len(source_vocab2index)
 encode_hidden_size = 30
 decode_hidden_size = 30
 batch_size = 100
-max_iter_num = 1000
+max_iter_num = 10000
 def get_batch(batch_size):
     start = int(np.random.uniform(0, len(source_data_original)-batch_size))
     
@@ -159,7 +174,7 @@ for i in range(max_iter_num):
                                                   seq_length: target_seq_length
                                                 })
     print(result[1])
-    if i % 200 == 0:
+    if i % 2000 == 0:
         print(batch_source_transform[0])
         print(result[2][0])
         print(map_index2word(batch_source_transform[0],source_index2vocab))

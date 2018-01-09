@@ -2,7 +2,7 @@ import numpy as np
 dictionary = "abcdefghijklmnopqrstuvwxyz"
 source = []
 for i in range(1000):    
-    string_length = int(np.random.uniform(2,10))
+    string_length = int(np.random.uniform(10,20))
     string = ""
     for j in range(string_length):
         random_char = int(np.random.uniform(0,26))
