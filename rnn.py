@@ -20,6 +20,7 @@ class RNN():
         #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicRNNCell(num_units=n_hidden, activation=tf.nn.relu), output_size = n_output)
         #cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden), output_size = n_output)
 #        cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.GRUCell(num_units=n_hidden), output_size = n_output)
+
 #        drop_cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=0.5)
 
         #https://stackoverflow.com/questions/44615147/valueerror-trying-to-share-variable-rnn-multi-rnn-cell-cell-0-basic-lstm-cell-k
